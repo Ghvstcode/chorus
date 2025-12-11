@@ -10,7 +10,7 @@ concurrency:
     cancel-in-progress: true
 
 env:
-    CN_APPLICATION: "melty/chorus"
+    CN_APPLICATION: "chorus/chorus"
 
 jobs:
     draft:

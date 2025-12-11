@@ -1,16 +1,13 @@
-name: Chorus CrabNebula Cloud QA Release
+name: Chorus CrabNebula Migration Release (melty org)
 on:
     workflow_dispatch:
-    push:
-        branches:
-            - main
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
 env:
-    CN_APPLICATION: "chorus/chorus"
+    CN_APPLICATION: "melty/chorus"
 
 jobs:
     draft:
@@ -23,8 +20,8 @@ jobs:
             - name: create draft release
               uses: crabnebula-dev/cloud-release@v0
               with:
-                  command: release draft ${{ env.CN_APPLICATION }} --framework tauri --channel qa
-                  api-key: ${{ secrets.CN_API_KEY }}
+                  command: release draft ${{ env.CN_APPLICATION }} --framework tauri
+                  api-key: ${{ secrets.CN_API_KEY_OLD }}
 
     build:
         needs: draft
@@ -60,14 +57,12 @@ jobs:
             - name: Check formatting
               run: pnpm format:check
 
-            - name: Run ESLint
-              run: pnpm lint
-
             - name: Install x86_64-apple-darwin for mac and build Tauri binaries
               if: matrix.os == 'macos-latest'
               run: |
                   rustup target add x86_64-apple-darwin
-                  pnpm tauri build --target aarch64-apple-darwin --config src-tauri/tauri.qa.conf.json
+                  pnpm tauri build --target x86_64-apple-darwin --config src-tauri/tauri.conf.json
+                  pnpm tauri build --target aarch64-apple-darwin --config src-tauri/tauri.conf.json
               env:
                   TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
                   TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -81,8 +76,8 @@ jobs:
             - name: upload assets
               uses: crabnebula-dev/cloud-release@v0
               with:
-                  command: release upload ${{ env.CN_APPLICATION }} --framework tauri --channel qa
-                  api-key: ${{ secrets.CN_API_KEY }}
+                  command: release upload ${{ env.CN_APPLICATION }} --framework tauri
+                  api-key: ${{ secrets.CN_API_KEY_OLD }}
                   path: ./src-tauri
 
     publish:
@@ -98,5 +93,5 @@ jobs:
             - name: publish release
               uses: crabnebula-dev/cloud-release@v0
               with:
-                  command: release publish ${{ env.CN_APPLICATION }} --framework tauri --channel qa
-                  api-key: ${{ secrets.CN_API_KEY }}
+                  command: release publish ${{ env.CN_APPLICATION }} --framework tauri
+                  api-key: ${{ secrets.CN_API_KEY_OLD }}
