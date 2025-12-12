@@ -1,10 +1,8 @@
-<a href="https://chorus.sh">
 <p align="center">
   <img src="app-icon.png" alt="Chorus icon" width="128" />
 </p>
-</a>
 
-<h1 align="center">Chorus</h1>
+<h1 align="center"><a href="https://chorus.sh">Chorus</a></h1>
 
 <p align="center">All the AI, on your Mac. Built by the creators of <a href="https://conductor.build">Conductor.</a></p>
 
