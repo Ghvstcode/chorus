@@ -150,8 +150,13 @@ function ModelGroup({
         (model: ModelConfig) => {
             const provider = getProviderName(model.modelId);
 
-            // Local models (ollama, lmstudio) don't require API keys
-            if (provider === "ollama" || provider === "lmstudio") {
+            // Local models (ollama, lmstudio) and claude-code don't require API keys
+            // claude-code uses the local Claude Code CLI authentication
+            if (
+                provider === "ollama" ||
+                provider === "lmstudio" ||
+                provider === "claude-code"
+            ) {
                 return false;
             }
 
@@ -465,10 +470,16 @@ export function ManageModelsBox({
             (m) => getProviderName(m.modelId) === "openrouter",
         );
 
+        // Claude Code models use the local Claude Code CLI subscription
+        const claudeCodeModels = systemModels.filter(
+            (m) => getProviderName(m.modelId) === "claude-code",
+        );
+
         return {
             custom: filterBySearch(userModels, searchTerms),
             local: filterBySearch(localModels, searchTerms),
             openrouter: filterBySearch(openrouterModels, searchTerms),
+            claudeCode: filterBySearch(claudeCodeModels, searchTerms),
         };
     }, [modelConfigs.data, searchQuery]);
 
@@ -684,6 +695,23 @@ export function ManageModelsBox({
                                     </div>
                                 ) : undefined
                             }
+                        />
+                    )}
+
+                    {/* Claude Code Models - uses local Claude Code subscription */}
+                    {modelGroups.claudeCode.length > 0 && (
+                        <ModelGroup
+                            heading={
+                                <div className="flex items-center justify-between w-full">
+                                    <span>Claude Code Subscription</span>
+                                </div>
+                            }
+                            models={modelGroups.claudeCode}
+                            checkedModelConfigIds={checkedModelConfigIds}
+                            mode={mode}
+                            onToggleModelConfig={handleToggleModelConfig}
+                            onAddApiKey={handleAddApiKey}
+                            groupId="claude-code"
                         />
                     )}
 
