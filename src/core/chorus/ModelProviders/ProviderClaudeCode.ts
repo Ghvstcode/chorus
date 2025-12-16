@@ -74,23 +74,19 @@ export class ProviderClaudeCode implements IProvider {
         onComplete,
         onError,
     }: StreamResponseParams): Promise<void> {
-        // Generate a unique request ID for this stream
         const requestId = crypto.randomUUID();
 
-        // Convert conversation to a prompt string
-        // For multi-turn conversations, we format them as a single prompt with context
         const prompt = await this.formatConversationAsPrompt(llmConversation);
 
-        // Determine model to use (extract from modelId like "claude-code::opus")
         const modelPart = modelConfig.modelId.split("::")[1];
         const model = this.mapModelName(modelPart);
 
-        // Set up event listener for streaming responses
         let unlisten: UnlistenFn | undefined;
         let hasCompleted = false;
+        let stderrContent = "";
+        let hasReceivedContent = false;
 
         try {
-            // Listen for stream events from Tauri
             unlisten = await listen<TauriStreamEvent>(
                 `claude-code-stream-${requestId}`,
                 (event) => {
@@ -101,7 +97,14 @@ export class ProviderClaudeCode implements IProvider {
                             const message = JSON.parse(
                                 payload.data,
                             ) as ClaudeCodeStreamMessage;
-                            this.handleStreamMessage(message, onChunk);
+                            const hadContent = this.handleStreamMessage(
+                                message,
+                                onChunk,
+                                onError,
+                            );
+                            if (hadContent) {
+                                hasReceivedContent = true;
+                            }
                         } catch {
                             // Not valid JSON, might be partial output
                             console.warn(
@@ -114,27 +117,43 @@ export class ProviderClaudeCode implements IProvider {
                             hasCompleted = true;
                             onError(payload.error || "Unknown error");
                         }
+                    } else if (payload.type === "stderr" && payload.data) {
+                        stderrContent += payload.data;
                     } else if (payload.type === "done") {
                         if (!hasCompleted) {
                             hasCompleted = true;
-                            void onComplete();
+                            if (
+                                payload.exitCode !== undefined &&
+                                payload.exitCode !== 0
+                            ) {
+                                if (stderrContent && !hasReceivedContent) {
+                                    onError(
+                                        stderrContent.trim() ||
+                                            `Claude Code CLI exited with code ${payload.exitCode}`,
+                                    );
+                                } else if (!hasReceivedContent) {
+                                    onError(
+                                        `Claude Code CLI exited with code ${payload.exitCode}`,
+                                    );
+                                } else {
+                                    void onComplete();
+                                }
+                            } else {
+                                void onComplete();
+                            }
                         }
                     }
                 },
             );
 
-            // Start the Claude Code CLI process
-            // By default, disable project context so Claude acts as a general assistant
             await invoke("stream_claude_code_response", {
                 requestId,
                 prompt,
                 systemPrompt: modelConfig.systemPrompt || undefined,
                 model,
-                disableProjectContext: true, // Run as general assistant, not project-aware
+                disableProjectContext: true,
             });
 
-            // Wait for completion (the done event will trigger onComplete)
-            // We need to wait here to keep the listener active
             await new Promise<void>((resolve) => {
                 const checkInterval = setInterval(() => {
                     if (hasCompleted) {
@@ -164,34 +183,32 @@ export class ProviderClaudeCode implements IProvider {
     private handleStreamMessage(
         message: ClaudeCodeStreamMessage,
         onChunk: (chunk: string) => void,
-    ): void {
+        onError: (errorMessage: string) => void,
+    ): boolean {
         if (message.type === "assistant" && message.message?.content) {
-            // Extract text from content blocks
+            let hadContent = false;
             for (const block of message.message.content) {
                 if (block.type === "text" && "text" in block) {
                     onChunk(block.text);
+                    hadContent = true;
                 }
             }
+            return hadContent;
         }
-        // We ignore "system" init messages and "result" messages
-        // The "result" contains the final text but we've already streamed it
+
+        if (message.type === "result" && message.subtype === "error") {
+            onError(message.error || "Claude Code returned an error");
+            return false;
+        }
+
+        return false;
     }
 
     private mapModelName(modelPart: string | undefined): string | undefined {
-        // Map our model identifiers to Claude CLI model names
-        switch (modelPart) {
-            case "opus":
-            case "opus-4.5":
-                return "opus";
-            case "sonnet":
-            case "sonnet-4.5":
-                return "sonnet";
-            case "haiku":
-                return "haiku";
-            default:
-                // Let Claude CLI use its default
-                return undefined;
+        if (!modelPart || modelPart === "default") {
+            return undefined;
         }
+        return modelPart;
     }
 
     private async formatConversationAsPrompt(

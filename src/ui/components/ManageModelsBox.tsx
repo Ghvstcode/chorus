@@ -132,6 +132,7 @@ function ModelGroup({
     emptyState,
     onAddApiKey,
     groupId,
+    claudeCodeAvailable,
 }: {
     heading: React.ReactNode;
     models: ModelConfig[];
@@ -142,6 +143,7 @@ function ModelGroup({
     emptyState?: React.ReactNode;
     onAddApiKey: () => void;
     groupId?: string;
+    claudeCodeAvailable?: boolean;
 }) {
     const { data: apiKeys } = AppMetadataAPI.useApiKeys();
 
@@ -150,14 +152,14 @@ function ModelGroup({
         (model: ModelConfig) => {
             const provider = getProviderName(model.modelId);
 
-            // Local models (ollama, lmstudio) and claude-code don't require API keys
-            // claude-code uses the local Claude Code CLI authentication
-            if (
-                provider === "ollama" ||
-                provider === "lmstudio" ||
-                provider === "claude-code"
-            ) {
+            // Local models (ollama, lmstudio) don't require API keys
+            if (provider === "ollama" || provider === "lmstudio") {
                 return false;
+            }
+
+            // Claude Code requires the CLI to be installed
+            if (provider === "claude-code") {
+                return !claudeCodeAvailable;
             }
 
             // If user has API key for this provider, allow it
@@ -175,7 +177,7 @@ function ModelGroup({
             // No API key for this provider - model is not allowed
             return true;
         },
-        [apiKeys],
+        [apiKeys, claudeCodeAvailable],
     );
 
     return (
@@ -224,19 +226,25 @@ function ModelGroup({
                             </div>
                             <div className="flex items-center gap-1">
                                 {isModelNotAllowed(m) ? (
-                                    <Button
-                                        variant="link"
-                                        size="sm"
-                                        className="text-accent-foreground h-auto p-0 px-1.5"
-                                        onClick={(
-                                            e: React.MouseEvent<HTMLButtonElement>,
-                                        ) => {
-                                            e.stopPropagation();
-                                            onAddApiKey();
-                                        }}
-                                    >
-                                        Add API Key
-                                    </Button>
+                                    getProviderName(m.modelId) === "claude-code" ? (
+                                        <span className="text-sm text-muted-foreground">
+                                            Install Claude Code CLI
+                                        </span>
+                                    ) : (
+                                        <Button
+                                            variant="link"
+                                            size="sm"
+                                            className="text-accent-foreground h-auto p-0 px-1.5"
+                                            onClick={(
+                                                e: React.MouseEvent<HTMLButtonElement>,
+                                            ) => {
+                                                e.stopPropagation();
+                                                onAddApiKey();
+                                            }}
+                                        >
+                                            Add API Key
+                                        </Button>
+                                    )
                                 ) : (
                                     <>
                                         <p className="text-sm text-muted-foreground opacity-0 group-data-[selected=true]:opacity-100 transition-opacity">
@@ -314,6 +322,8 @@ export function ManageModelsBox({
     const modelConfigs = ModelsAPI.useModelConfigs();
     const showOpenRouter = AppMetadataAPI.useShowOpenRouter();
     const setShowOpenRouterMutation = AppMetadataAPI.useSetShowOpenRouter();
+    const claudeCodeAvailableQuery = ModelsAPI.useClaudeCodeAvailable();
+    const claudeCodeAvailable = claudeCodeAvailableQuery.data?.available ?? false;
 
     const selectedSingleModelConfig = useMemo(() => {
         if (mode.type === "single") {
@@ -712,6 +722,7 @@ export function ManageModelsBox({
                             onToggleModelConfig={handleToggleModelConfig}
                             onAddApiKey={handleAddApiKey}
                             groupId="claude-code"
+                            claudeCodeAvailable={claudeCodeAvailable}
                         />
                     )}
 

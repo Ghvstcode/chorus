@@ -771,39 +771,43 @@ pub fn get_file_metadata(path: String) -> Result<serde_json::Value, String> {
     }))
 }
 
-/// Check if Claude Code CLI is installed and authenticated
 #[tauri::command]
 pub fn check_claude_code_available() -> Result<serde_json::Value, String> {
     use std::process::Command;
 
-    // Check if claude CLI exists
+    let which_output = Command::new("which")
+        .arg("claude")
+        .output();
+
+    let cli_exists = match which_output {
+        Ok(output) => output.status.success(),
+        Err(_) => false,
+    };
+
+    if !cli_exists {
+        return Ok(serde_json::json!({
+            "available": false,
+            "version": null,
+            "authenticated": false
+        }));
+    }
+
     let version_output = Command::new("claude")
         .arg("--version")
         .output();
 
-    match version_output {
+    let version = match version_output {
         Ok(output) if output.status.success() => {
-            let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
-
-            // Check if credentials file exists
-            let home = std::env::var("HOME").unwrap_or_default();
-            let credentials_path = format!("{}/.claude/.credentials.json", home);
-            let has_credentials = std::path::Path::new(&credentials_path).exists();
-
-            Ok(serde_json::json!({
-                "available": true,
-                "version": version,
-                "authenticated": has_credentials
-            }))
+            Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
         }
-        _ => {
-            Ok(serde_json::json!({
-                "available": false,
-                "version": null,
-                "authenticated": false
-            }))
-        }
-    }
+        _ => None,
+    };
+
+    Ok(serde_json::json!({
+        "available": true,
+        "version": version,
+        "authenticated": true
+    }))
 }
 
 /// Stream a response from Claude Code CLI
