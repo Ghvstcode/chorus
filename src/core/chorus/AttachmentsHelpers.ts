@@ -101,7 +101,8 @@ export async function resizeImageCompression(file: File): Promise<File> {
     const { resizedData } = await resizeImageCore(uint8Arr, file.name);
 
     // Create a new File object from the resized data
-    return new File([resizedData], file.name, { type: file.type });
+    // Cast to BlobPart to satisfy TypeScript's strict type checking
+    return new File([resizedData as BlobPart], file.name, { type: file.type });
 }
 
 export const fileTypeToAttachmentType = (
@@ -160,7 +161,8 @@ export async function getFileFromPath(filePath: string): Promise<File> {
     const fileName = path.basename(filePath);
 
     // Create and return the File object
-    return new File([fileData], fileName, {
+    // Cast to BlobPart to satisfy TypeScript's strict type checking
+    return new File([fileData as BlobPart], fileName, {
         type: mimeType,
         lastModified: Date.now(),
     });
@@ -253,7 +255,11 @@ export async function convertPdfToPng(filePath: string): Promise<string[]> {
         canvas.width = viewport.width;
 
         // Render PDF page to canvas
+        // Note: pdfjs-dist v5.4+ requires the 'canvas' parameter in RenderParameters
+        // In older versions, only canvasContext was required, but the new API
+        // makes 'canvas' a required property for improved type safety
         await page.render({
+            canvas,
             canvasContext: context,
             viewport: viewport,
         }).promise;

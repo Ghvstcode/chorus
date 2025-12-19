@@ -264,7 +264,7 @@ function ContextLimitError({ chatId }: { chatId: string }) {
                         let newStoredPath: string;
                         if (originalAttachment.type === "image") {
                             const file = new File(
-                                [fileData],
+                                [fileData as BlobPart],
                                 originalAttachment.originalName,
                                 {
                                     type: `image/${originalAttachment.originalName.split(".").pop()}`,
@@ -275,7 +275,7 @@ function ContextLimitError({ chatId }: { chatId: string }) {
                         } else {
                             // For non-images, we need to create a temporary file first
                             const tempFile = new File(
-                                [fileData],
+                                [fileData as BlobPart],
                                 originalAttachment.originalName,
                             );
                             const result =

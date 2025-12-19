@@ -21,7 +21,8 @@ import * as Models from "../Models";
 import { UpdateQueue } from "../UpdateQueue";
 import posthog from "posthog-js";
 import { v4 as uuidv4 } from "uuid";
-import { simpleLLM, simpleSummarizeLLM } from "../simpleLLM";
+import { simpleLLM } from "../simpleLLM";
+import { SimpleCompletionMode } from "../ModelProviders/simple/ISimpleCompletionProvider";
 import * as Prompts from "../prompts/prompts";
 import { useNavigate } from "react-router-dom";
 import { ToolsetsManager } from "../ToolsetsManager";
@@ -173,29 +174,32 @@ export async function fetchMessageSets(chatId: string) {
                 "SELECT * FROM messages WHERE chat_id = ?",
                 [chatId],
             ),
-            (
-                await db.select<MessagePartDBRow[]>(
-                    `SELECT * FROM message_parts WHERE chat_id = ?`,
-                    [chatId],
-                )
-            ).reduce((acc, mp) => {
-                // put the message parts into a map by message_id
-                if (!acc.has(mp.message_id)) acc.set(mp.message_id, []);
-                acc.get(mp.message_id)!.push(mp);
-                return acc;
-            }, new Map<string, MessagePartDBRow[]>()),
-            (
-                await db.select<(AttachmentDBRow & { message_id: string })[]>(
+            db
+                .select<
+                    MessagePartDBRow[]
+                >(`SELECT * FROM message_parts WHERE chat_id = ?`, [chatId])
+                .then((rows) =>
+                    rows.reduce((acc, mp) => {
+                        // put the message parts into a map by message_id
+                        if (!acc.has(mp.message_id)) acc.set(mp.message_id, []);
+                        acc.get(mp.message_id)!.push(mp);
+                        return acc;
+                    }, new Map<string, MessagePartDBRow[]>()),
+                ),
+            db
+                .select<(AttachmentDBRow & { message_id: string })[]>(
                     `SELECT message_id, attachments.id, type, original_name, path, is_loading, ephemeral FROM message_attachments
                 JOIN attachments ON message_attachments.attachment_id = attachments.id
                 WHERE message_id in (select id from messages where chat_id = ?)`,
                     [chatId],
                 )
-            ).reduce((acc, a) => {
-                if (!acc.has(a.message_id)) acc.set(a.message_id, []);
-                acc.get(a.message_id)!.push(a);
-                return acc;
-            }, new Map<string, AttachmentDBRow[]>()),
+                .then((rows) =>
+                    rows.reduce((acc, a) => {
+                        if (!acc.has(a.message_id)) acc.set(a.message_id, []);
+                        acc.get(a.message_id)!.push(a);
+                        return acc;
+                    }, new Map<string, AttachmentDBRow[]>()),
+                ),
         ]);
 
     const messages = messagesDbRows.map((m) =>
@@ -2164,9 +2168,8 @@ export function useSummarizeChat() {
                           conversationText,
                       );
 
-            const summary = await simpleSummarizeLLM(prompt, {
-                // NOTE: If you change this model _provider_, you'll need to update the response handling in simpleSummarizeLLM.ts
-                model: "gemini-2.5-flash",
+            const summary = await simpleLLM(prompt, {
+                model: SimpleCompletionMode.SUMMARIZER,
                 maxTokens: 8192,
             });
 
@@ -2925,7 +2928,6 @@ If there's no information in the message, just return "Untitled Chat".
 ${userMessageText}
 </message>`,
                 {
-                    model: "claude-3-5-sonnet-latest",
                     maxTokens: 100,
                 },
             );
