@@ -833,7 +833,6 @@ pub async fn stream_claude_code_response(
     cmd.arg("-p") // Print mode (non-interactive)
         .arg("--output-format")
         .arg("stream-json")
-        .arg("--verbose")
         .arg("--permission-mode")
         .arg("bypassPermissions"); // Auto-approve for chat use
 

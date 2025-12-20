@@ -78,8 +78,8 @@ export class ProviderClaudeCode implements IProvider {
 
         const prompt = await this.formatConversationAsPrompt(llmConversation);
 
-        const modelPart = modelConfig.modelId.split("::")[1];
-        const model = this.mapModelName(modelPart);
+        // Always use undefined to let Claude Code CLI use its configured default model
+        const model = undefined;
 
         let unlisten: UnlistenFn | undefined;
         let hasCompleted = false;
@@ -202,13 +202,6 @@ export class ProviderClaudeCode implements IProvider {
         }
 
         return false;
-    }
-
-    private mapModelName(modelPart: string | undefined): string | undefined {
-        if (!modelPart || modelPart === "default") {
-            return undefined;
-        }
-        return modelPart;
     }
 
     private async formatConversationAsPrompt(
