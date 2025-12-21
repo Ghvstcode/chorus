@@ -2460,17 +2460,21 @@ You have full access to bash commands on the user''''s computer. If you write a 
         },
         Migration {
             version: 132,
-            description: "add claude code provider model for using claude code subscription",
+            description: "add claude code provider models for using claude code subscription",
             kind: MigrationKind::Up,
             sql: r#"
-                -- Add Claude (via Claude Code) model
-                -- This uses the local Claude Code CLI and subscription instead of an API key
+                -- Add Claude models via Claude Code CLI
+                -- These use the local Claude Code CLI and subscription instead of an API key
                 INSERT OR REPLACE INTO models (id, display_name, is_enabled, supported_attachment_types) VALUES
-                    ('claude-code::default', 'Claude (via Claude Code)', 1, '["text", "webpage"]');
+                    ('claude-code::claude-sonnet-4-5-20250929', 'Claude Sonnet 4.5 (via Claude Code)', 1, '["text", "webpage", "image", "pdf"]'),
+                    ('claude-code::claude-opus-4-20250514', 'Claude Opus 4 (via Claude Code)', 1, '["text", "webpage", "image", "pdf"]'),
+                    ('claude-code::claude-sonnet-4-20250514', 'Claude Sonnet 4 (via Claude Code)', 1, '["text", "webpage", "image", "pdf"]');
 
-                -- Add Claude (via Claude Code) model config
+                -- Add model configs for each variant
                 INSERT OR REPLACE INTO model_configs (author, id, model_id, display_name, system_prompt, is_default, new_until) VALUES
-                    ('system', 'claude-code::default', 'claude-code::default', 'Claude (via Claude Code)', '', 0, '2026-01-15 00:00:00');
+                    ('system', 'claude-code::claude-sonnet-4-5-20250929', 'claude-code::claude-sonnet-4-5-20250929', 'Claude Sonnet 4.5 (via Claude Code)', '', 0, '2026-01-15 00:00:00'),
+                    ('system', 'claude-code::claude-opus-4-20250514', 'claude-code::claude-opus-4-20250514', 'Claude Opus 4 (via Claude Code)', '', 0, '2026-01-15 00:00:00'),
+                    ('system', 'claude-code::claude-sonnet-4-20250514', 'claude-code::claude-sonnet-4-20250514', 'Claude Sonnet 4 (via Claude Code)', '', 0, '2026-01-15 00:00:00');
             "#,
         },
     ];

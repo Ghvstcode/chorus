@@ -78,8 +78,9 @@ export class ProviderClaudeCode implements IProvider {
 
         const prompt = await this.formatConversationAsPrompt(llmConversation);
 
-        // Always use undefined to let Claude Code CLI use its configured default model
-        const model = undefined;
+        // Extract model name from model ID like "claude-code::claude-sonnet-4-5-20250929"
+        const modelName = modelConfig.modelId.split("::")[1];
+        const model = modelName === "default" ? undefined : modelName;
 
         let unlisten: UnlistenFn | undefined;
         let hasCompleted = false;
