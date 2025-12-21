@@ -4,7 +4,7 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@ui/components/ui/collapsible";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import React from "react";
 import { CodeBlock } from "./CodeBlock";
 import { extractToolSummary } from "./toolCallHelpers";
@@ -31,60 +31,66 @@ function extractTextFromChildren(children: React.ReactNode): string {
 export const ToolCallGroup = ({ children }: { children?: React.ReactNode }) => {
     const [isOpen, setIsOpen] = useState(false);
 
-    // Parse children to extract tool calls
-    const toolCalls: ToolCall[] = [];
+    // Memoize the expensive parsing operation based on children
+    const toolCalls = useMemo(() => {
+        const calls: ToolCall[] = [];
 
-    // Extract tool call data from children
-    if (children) {
-        const childArray = Array.isArray(children) ? children : [children];
+        // Extract tool call data from children
+        if (children) {
+            const childArray = Array.isArray(children) ? children : [children];
 
-        // First, try to extract from properly parsed ToolCall components
-        childArray.forEach((child: any) => {
-            if (child?.props?.name && child?.props?.["data-input"]) {
-                try {
-                    const content = atob(child.props["data-input"]);
-                    toolCalls.push({
-                        name: child.props.name,
-                        content: content,
-                    });
-                } catch (e) {
-                    console.error('[ToolCallGroup] Failed to decode tool call:', e);
+            // First, try to extract from properly parsed ToolCall components
+            childArray.forEach((child: any) => {
+                if (child?.props?.name && child?.props?.["data-input"]) {
+                    try {
+                        const content = atob(child.props["data-input"]);
+                        calls.push({
+                            name: child.props.name,
+                            content: content,
+                        });
+                    } catch (e) {
+                        console.error('[ToolCallGroup] Failed to decode tool call:', e);
+                    }
                 }
-            }
-        });
+            });
 
-        // This handles cases where react-markdown doesn't parse all <tool-call> tags correctly
-        if (toolCalls.length === 0 || childArray.some((child: any) => typeof child === "string")) {
-            const htmlContent = extractTextFromChildren(children);
+            // This handles cases where react-markdown doesn't parse all <tool-call> tags correctly
+            if (calls.length === 0 || childArray.some((child: any) => typeof child === "string")) {
+                const htmlContent = extractTextFromChildren(children);
 
-            // Extract tool calls from HTML string
-            const toolCallRegex = /<tool-call\s+name="([^"]+)"\s+data-input="([^"]+)"><\/tool-call>/g;
-            let match;
+                // Extract tool calls from HTML string
+                const toolCallRegex = /<tool-call\s+name="([^"]+)"\s+data-input="([^"]+)"><\/tool-call>/g;
+                let match;
 
-            while ((match = toolCallRegex.exec(htmlContent)) !== null) {
-                const [, name, dataInput] = match;
-                try {
-                    const content = atob(dataInput);
-                    toolCalls.push({
-                        name,
-                        content,
-                    });
-                } catch (e) {
-                    console.error('[ToolCallGroup] Failed to decode tool call from HTML:', e);
+                while ((match = toolCallRegex.exec(htmlContent)) !== null) {
+                    const [, name, dataInput] = match;
+                    try {
+                        const content = atob(dataInput);
+                        calls.push({
+                            name,
+                            content,
+                        });
+                    } catch (e) {
+                        console.error('[ToolCallGroup] Failed to decode tool call from HTML:', e);
+                    }
                 }
             }
         }
-    }
 
-    // Group tools by name for summary
-    const toolCounts = toolCalls.reduce((acc, tool) => {
-        acc[tool.name] = (acc[tool.name] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
+        return calls;
+    }, [children]);
 
-    const summary = Object.entries(toolCounts)
-        .map(([name, count]) => count > 1 ? `${name} (${count}×)` : name)
-        .join(", ");
+    // Memoize the summary calculation
+    const summary = useMemo(() => {
+        const toolCounts = toolCalls.reduce((acc, tool) => {
+            acc[tool.name] = (acc[tool.name] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return Object.entries(toolCounts)
+            .map(([name, count]) => count > 1 ? `${name} (${count}×)` : name)
+            .join(", ");
+    }, [toolCalls]);
 
     return (
         <Collapsible
@@ -120,7 +126,11 @@ export const ToolCallGroup = ({ children }: { children?: React.ReactNode }) => {
 function ToolCallItem({ name, content }: { name: string; content: string }) {
     const [isOpen, setIsOpen] = useState(false);
 
-    const { summary, displayContent, isJSON } = extractToolSummary(content);
+    // Memoize the tool summary extraction
+    const { summary, displayContent, isJSON } = useMemo(
+        () => extractToolSummary(content),
+        [content]
+    );
 
     return (
         <Collapsible

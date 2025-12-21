@@ -4,7 +4,7 @@ import {
     CollapsibleContent,
     CollapsibleTrigger,
 } from "@ui/components/ui/collapsible";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { CodeBlock } from "./CodeBlock";
 import { extractToolSummary } from "./toolCallHelpers";
 
@@ -18,7 +18,11 @@ export const ToolCallBlock = ({
     // Always start collapsed for cleaner UX
     const [isOpen, setIsOpen] = useState(false);
 
-    const { summary, displayContent, isJSON } = extractToolSummary(content);
+    // Memoize the tool summary extraction
+    const { summary, displayContent, isJSON } = useMemo(
+        () => extractToolSummary(content),
+        [content]
+    );
 
     return (
         <Collapsible
