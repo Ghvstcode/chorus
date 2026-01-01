@@ -165,14 +165,17 @@ export class ProviderClaudeCode implements IProvider {
                 }, 100);
 
                 // Timeout after 5 minutes
-                setTimeout(() => {
-                    if (!hasCompleted) {
-                        hasCompleted = true;
-                        clearInterval(checkInterval);
-                        onError("Request timed out after 5 minutes");
-                        resolve();
-                    }
-                }, 5 * 60 * 1000);
+                setTimeout(
+                    () => {
+                        if (!hasCompleted) {
+                            hasCompleted = true;
+                            clearInterval(checkInterval);
+                            onError("Request timed out after 5 minutes");
+                            resolve();
+                        }
+                    },
+                    5 * 60 * 1000,
+                );
             });
         } finally {
             // Clean up the event listener
@@ -206,7 +209,7 @@ export class ProviderClaudeCode implements IProvider {
                         : "";
 
                     // Base64 encode the content to avoid HTML parsing issues
-                    const encodedInput = Buffer.from(input).toString('base64');
+                    const encodedInput = Buffer.from(input).toString("base64");
 
                     const toolTag = `\n<tool-call name="${toolBlock.name}" data-input="${encodedInput}"></tool-call>\n`;
 
@@ -264,7 +267,10 @@ export class ProviderClaudeCode implements IProvider {
             } else if (attachment.type === "webpage") {
                 const webContent = await readWebpageAttachment(attachment);
                 content += `\n\n[Webpage: ${attachment.originalName}]\n${webContent}`;
-            } else if (attachment.type === "image" || attachment.type === "pdf") {
+            } else if (
+                attachment.type === "image" ||
+                attachment.type === "pdf"
+            ) {
                 // Images and PDFs are not supported in CLI print mode without tools
                 content += `\n\n[Attachment: ${attachment.originalName}] (Note: ${attachment.type} attachments are not supported with Claude Code in general assistant mode)`;
             }

@@ -1,3 +1,22 @@
+interface ToolCallParsedContent {
+    description?: string;
+    prompt?: string;
+    command?: string;
+    file_path?: string;
+    path?: string;
+    pattern?: string;
+}
+
+function isToolCallParsedContent(
+    value: unknown,
+): value is ToolCallParsedContent {
+    return typeof value === "object" && value !== null;
+}
+
+function getString(value: unknown): string | undefined {
+    return typeof value === "string" ? value : undefined;
+}
+
 /**
  * Extracts a human-readable summary from tool call content
  * @param content - Raw content string (usually JSON)
@@ -9,25 +28,33 @@ export function extractToolSummary(content: string): {
     isJSON: boolean;
 } {
     try {
-        const parsed = JSON.parse(content);
+        const parsed: unknown = JSON.parse(content);
         const displayContent = JSON.stringify(parsed, null, 2);
+
+        if (!isToolCallParsedContent(parsed)) {
+            return {
+                summary: "",
+                displayContent,
+                isJSON: true,
+            };
+        }
 
         // Extract summary from common fields
         // Show full description (usually concise and meaningful)
-        if (parsed.description) {
+        const description = getString(parsed.description);
+        if (description) {
             return {
-                summary: parsed.description,
+                summary: description,
                 displayContent,
                 isJSON: true,
             };
         }
 
         // Truncate prompts as they can be very long
-        if (parsed.prompt) {
+        const prompt = getString(parsed.prompt);
+        if (prompt) {
             const truncated =
-                parsed.prompt.length > 60
-                    ? parsed.prompt.substring(0, 60) + "..."
-                    : parsed.prompt;
+                prompt.length > 60 ? prompt.substring(0, 60) + "..." : prompt;
             return {
                 summary: truncated,
                 displayContent,
@@ -36,33 +63,37 @@ export function extractToolSummary(content: string): {
         }
 
         // Show full command, file_path, path, pattern (usually short)
-        if (parsed.command) {
+        const command = getString(parsed.command);
+        if (command) {
             return {
-                summary: parsed.command,
+                summary: command,
                 displayContent,
                 isJSON: true,
             };
         }
 
-        if (parsed.file_path) {
+        const filePath = getString(parsed.file_path);
+        if (filePath) {
             return {
-                summary: parsed.file_path,
+                summary: filePath,
                 displayContent,
                 isJSON: true,
             };
         }
 
-        if (parsed.path) {
+        const path = getString(parsed.path);
+        if (path) {
             return {
-                summary: parsed.path,
+                summary: path,
                 displayContent,
                 isJSON: true,
             };
         }
 
-        if (parsed.pattern) {
+        const pattern = getString(parsed.pattern);
+        if (pattern) {
             return {
-                summary: parsed.pattern,
+                summary: pattern,
                 displayContent,
                 isJSON: true,
             };

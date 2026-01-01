@@ -21,7 +21,7 @@ export const ToolCallBlock = ({
     // Memoize the tool summary extraction
     const { summary, displayContent, isJSON } = useMemo(
         () => extractToolSummary(content),
-        [content]
+        [content],
     );
 
     return (
@@ -36,11 +36,15 @@ export const ToolCallBlock = ({
             <CollapsibleTrigger className="group font-mono text-[11px] text-left flex items-center gap-2.5 hover:text-foreground/80">
                 <div className="flex items-center gap-2 min-w-0">
                     <WrenchIcon className="w-3 h-3 flex-shrink-0 opacity-50" />
-                    <span className="flex-shrink-0 font-medium opacity-70">{toolName}</span>
+                    <span className="flex-shrink-0 font-medium opacity-70">
+                        {toolName}
+                    </span>
                     {summary && (
                         <>
                             <span className="opacity-30">·</span>
-                            <span className="opacity-50 truncate">{summary}</span>
+                            <span className="opacity-50 truncate">
+                                {summary}
+                            </span>
                         </>
                     )}
                 </div>

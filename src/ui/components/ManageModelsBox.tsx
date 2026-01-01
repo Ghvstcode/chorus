@@ -46,6 +46,7 @@ import * as AppMetadataAPI from "@core/chorus/api/AppMetadataAPI";
 import { hasApiKey } from "@core/utilities/ProxyUtils";
 import * as ModelsAPI from "@core/chorus/api/ModelsAPI";
 import * as MessageAPI from "@core/chorus/api/MessageAPI";
+import { useSettings } from "./hooks/useSettings";
 
 // Helper function to filter models by search terms
 const filterBySearch = (models: ModelConfig[], searchTerms: string[]) => {
@@ -59,6 +60,29 @@ const filterBySearch = (models: ModelConfig[], searchTerms: string[]) => {
                 providerLabel.toLowerCase().includes(term),
         );
     });
+};
+
+// Helper function to format pricing for display (per million tokens)
+const formatPricing = (model: ModelConfig): string | null => {
+    if (
+        model.promptPricePerToken === undefined ||
+        model.completionPricePerToken === undefined
+    ) {
+        return null;
+    }
+
+    const inputPricePerMillion = model.promptPricePerToken * 1_000_000;
+    const outputPricePerMillion = model.completionPricePerToken * 1_000_000;
+
+    // Format with appropriate decimal places
+    const formatPrice = (price: number): string => {
+        if (price >= 100) return price.toFixed(0);
+        if (price >= 10) return price.toFixed(1);
+        if (price >= 1) return price.toFixed(2);
+        return price.toFixed(3);
+    };
+
+    return `$${formatPrice(inputPricePerMillion)} / $${formatPrice(outputPricePerMillion)} per 1M tokens`;
 };
 
 // Helper function to check if a model is still considered "new"
@@ -133,6 +157,7 @@ function ModelGroup({
     onAddApiKey,
     groupId,
     claudeCodeAvailable,
+    showCost,
 }: {
     heading: React.ReactNode;
     models: ModelConfig[];
@@ -144,6 +169,7 @@ function ModelGroup({
     onAddApiKey: () => void;
     groupId?: string;
     claudeCodeAvailable?: boolean;
+    showCost: boolean;
 }) {
     const { data: apiKeys } = AppMetadataAPI.useApiKeys();
 
@@ -222,11 +248,17 @@ function ModelGroup({
                                             </Badge>
                                         )}
                                     </div>
+                                    {showCost && formatPricing(m) && (
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                            {formatPricing(m)}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex items-center gap-1">
                                 {isModelNotAllowed(m) ? (
-                                    getProviderName(m.modelId) === "claude-code" ? (
+                                    getProviderName(m.modelId) ===
+                                    "claude-code" ? (
                                         <span className="text-sm text-muted-foreground">
                                             Install Claude Code CLI
                                         </span>
@@ -323,7 +355,10 @@ export function ManageModelsBox({
     const showOpenRouter = AppMetadataAPI.useShowOpenRouter();
     const setShowOpenRouterMutation = AppMetadataAPI.useSetShowOpenRouter();
     const claudeCodeAvailableQuery = ModelsAPI.useClaudeCodeAvailable();
-    const claudeCodeAvailable = claudeCodeAvailableQuery.data?.available ?? false;
+    const claudeCodeAvailable =
+        claudeCodeAvailableQuery.data?.available ?? false;
+    const settings = useSettings();
+    const showCost = settings?.showCost ?? false;
 
     const selectedSingleModelConfig = useMemo(() => {
         if (mode.type === "single") {
@@ -656,6 +691,7 @@ export function ManageModelsBox({
                             onToggleModelConfig={handleToggleModelConfig}
                             onAddApiKey={handleAddApiKey}
                             groupId="openrouter"
+                            showCost={showCost}
                             refreshButton={
                                 showOpenRouter && (
                                     <div className="flex items-center gap-1">
@@ -745,6 +781,7 @@ export function ManageModelsBox({
                             onAddApiKey={handleAddApiKey}
                             groupId="claude-code"
                             claudeCodeAvailable={claudeCodeAvailable}
+                            showCost={showCost}
                         />
                     )}
 
@@ -758,6 +795,7 @@ export function ManageModelsBox({
                             onToggleModelConfig={handleToggleModelConfig}
                             onAddApiKey={handleAddApiKey}
                             groupId="anthropic"
+                            showCost={showCost}
                         />
                     )}
                     {modelGroups.directByProvider.openai.length > 0 && (
@@ -769,6 +807,7 @@ export function ManageModelsBox({
                             onToggleModelConfig={handleToggleModelConfig}
                             onAddApiKey={handleAddApiKey}
                             groupId="openai"
+                            showCost={showCost}
                         />
                     )}
                     {modelGroups.directByProvider.google.length > 0 && (
@@ -780,6 +819,7 @@ export function ManageModelsBox({
                             onToggleModelConfig={handleToggleModelConfig}
                             onAddApiKey={handleAddApiKey}
                             groupId="google"
+                            showCost={showCost}
                         />
                     )}
                     {modelGroups.directByProvider.grok.length > 0 && (
@@ -791,6 +831,7 @@ export function ManageModelsBox({
                             onToggleModelConfig={handleToggleModelConfig}
                             onAddApiKey={handleAddApiKey}
                             groupId="grok"
+                            showCost={showCost}
                         />
                     )}
                     {modelGroups.directByProvider.perplexity.length > 0 && (
@@ -802,6 +843,7 @@ export function ManageModelsBox({
                             onToggleModelConfig={handleToggleModelConfig}
                             onAddApiKey={handleAddApiKey}
                             groupId="perplexity"
+                            showCost={showCost}
                         />
                     )}
 
@@ -830,6 +872,7 @@ export function ManageModelsBox({
                             onToggleModelConfig={handleToggleModelConfig}
                             onAddApiKey={handleAddApiKey}
                             groupId="custom"
+                            showCost={showCost}
                         />
                     )}
 
@@ -842,6 +885,7 @@ export function ManageModelsBox({
                         onToggleModelConfig={handleToggleModelConfig}
                         onAddApiKey={handleAddApiKey}
                         groupId="local"
+                        showCost={showCost}
                         refreshButton={
                             <button
                                 onClick={(e) => {

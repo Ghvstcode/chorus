@@ -3,6 +3,7 @@ import * as Models from "../Models";
 import { db } from "../DB";
 import { ModelConfig } from "../Models";
 import { checkClaudeCodeAvailable } from "../ModelProviders/ProviderClaudeCode";
+import { getApiKeys } from "./AppMetadataAPI";
 
 // all
 // --> list models
@@ -67,7 +68,13 @@ type ModelConfigDBRow = {
     budget_tokens: number | null;
     reasoning_effort: "low" | "medium" | "high" | null;
     new_until?: string;
+    prompt_price_per_token: number | null;
+    completion_price_per_token: number | null;
 };
+
+// Track whether we've attempted to refresh OpenRouter models within
+// the current session, and store the promise if a download is in progress.
+let openRouterDownloadPromise: Promise<number> | null = null;
 
 function readModel(row: ModelDBRow): Models.Model {
     return {
@@ -98,17 +105,35 @@ function readModelConfig(row: ModelConfigDBRow): ModelConfig {
         budgetTokens: row.budget_tokens ?? undefined,
         reasoningEffort: row.reasoning_effort ?? undefined,
         newUntil: row.new_until ?? undefined,
+        promptPricePerToken: row.prompt_price_per_token ?? undefined,
+        completionPricePerToken: row.completion_price_per_token ?? undefined,
     };
 }
 
 export async function fetchModelConfigs() {
+    // Fetch OpenRouter models if we haven't already and the user has an OpenRouter API key.
+    const apiKeys = await getApiKeys();
+    if (apiKeys.openrouter) {
+        // If a download is already in progress, wait for it to complete.
+        // Otherwise, start a new download and store the promise.
+        if (openRouterDownloadPromise) {
+            await openRouterDownloadPromise;
+        } else {
+            openRouterDownloadPromise = Models.downloadOpenRouterModels(db);
+            await openRouterDownloadPromise;
+            // Keep the promise stored so subsequent calls know it completed
+            // (we don't clear it to prevent re-downloads within the session)
+        }
+    }
+
     return (
         await db.select<ModelConfigDBRow[]>(
-            `SELECT model_configs.id, model_configs.display_name, model_configs.author, 
-                        model_configs.model_id, model_configs.system_prompt, models.is_enabled, 
+            `SELECT model_configs.id, model_configs.display_name, model_configs.author,
+                        model_configs.model_id, model_configs.system_prompt, models.is_enabled,
                         models.is_internal, models.supported_attachment_types, model_configs.is_default,
-                        models.is_deprecated, model_configs.budget_tokens, model_configs.reasoning_effort, model_configs.new_until
-                 FROM model_configs 
+                        models.is_deprecated, model_configs.budget_tokens, model_configs.reasoning_effort, model_configs.new_until,
+                        models.prompt_price_per_token, models.completion_price_per_token
+                 FROM model_configs
                  JOIN models ON model_configs.model_id = models.id
                  ORDER BY models.is_enabled DESC`,
         )
@@ -125,37 +150,39 @@ export async function fetchModelConfigsCompare(): Promise<ModelConfig[]> {
     return (
         await db.select<ModelConfigDBRow[]>(
             `WITH extracted_models AS (
-  SELECT 
+  SELECT
     json_each.value AS model_config_id,
     CAST(json_each.key AS INTEGER) AS original_order
-  FROM 
+  FROM
     app_metadata,
-    json_each(app_metadata.value) 
-  WHERE 
+    json_each(app_metadata.value)
+  WHERE
     app_metadata.key = 'selected_model_configs_compare'
 )
 
-SELECT 
-  mc.id, 
-  mc.display_name, 
-  mc.author, 
-  mc.model_id, 
-  mc.system_prompt, 
-  m.is_enabled, 
-  m.is_internal, 
-  m.supported_attachment_types, 
+SELECT
+  mc.id,
+  mc.display_name,
+  mc.author,
+  mc.model_id,
+  mc.system_prompt,
+  m.is_enabled,
+  m.is_internal,
+  m.supported_attachment_types,
   mc.is_default,
-  m.is_deprecated, 
-  mc.budget_tokens, 
+  m.is_deprecated,
+  mc.budget_tokens,
   mc.reasoning_effort,
-  em.original_order
-FROM 
+  em.original_order,
+  m.prompt_price_per_token,
+  m.completion_price_per_token
+FROM
   extracted_models em
-JOIN 
+JOIN
   model_configs mc ON mc.id = em.model_config_id
-JOIN 
+JOIN
   models m ON mc.model_id = m.id
-ORDER BY 
+ORDER BY
   em.original_order;`,
         )
     ).map(readModelConfig);
@@ -165,32 +192,34 @@ export async function fetchModelConfigChat() {
     const modelConfigChat = (
         await db.select<ModelConfigDBRow[]>(
             `WITH selected_config AS (
-  SELECT 
+  SELECT
     value AS model_config_id
-  FROM 
+  FROM
     app_metadata
-  WHERE 
+  WHERE
     key = 'selected_model_config_chat'
 )
 
-SELECT 
-  mc.id, 
-  mc.display_name, 
-  mc.author, 
-  mc.model_id, 
-  mc.system_prompt, 
-  m.is_enabled, 
-  m.is_internal, 
-  m.supported_attachment_types, 
+SELECT
+  mc.id,
+  mc.display_name,
+  mc.author,
+  mc.model_id,
+  mc.system_prompt,
+  m.is_enabled,
+  m.is_internal,
+  m.supported_attachment_types,
   mc.is_default,
-  m.is_deprecated, 
-  mc.budget_tokens, 
-  mc.reasoning_effort
-FROM 
+  m.is_deprecated,
+  mc.budget_tokens,
+  mc.reasoning_effort,
+  m.prompt_price_per_token,
+  m.completion_price_per_token
+FROM
   selected_config sc
-JOIN 
+JOIN
   model_configs mc ON mc.id = sc.model_config_id
-JOIN 
+JOIN
   models m ON mc.model_id = m.id;`,
         )
     ).map(readModelConfig);
@@ -201,32 +230,34 @@ export async function fetchModelConfigQuickChat() {
     const modelConfigs = await db
         .select<ModelConfigDBRow[]>(
             `WITH selected_config AS (
-  SELECT 
+  SELECT
     value AS model_config_id
-  FROM 
+  FROM
     app_metadata
-  WHERE 
+  WHERE
     key = 'quick_chat_model_config_id'
 )
 
-SELECT 
-  mc.id, 
-  mc.display_name, 
-  mc.author, 
-  mc.model_id, 
-  mc.system_prompt, 
-  m.is_enabled, 
-  m.is_internal, 
-  m.supported_attachment_types, 
+SELECT
+  mc.id,
+  mc.display_name,
+  mc.author,
+  mc.model_id,
+  mc.system_prompt,
+  m.is_enabled,
+  m.is_internal,
+  m.supported_attachment_types,
   mc.is_default,
-  m.is_deprecated, 
-  mc.budget_tokens, 
-  mc.reasoning_effort
-FROM 
+  m.is_deprecated,
+  mc.budget_tokens,
+  mc.reasoning_effort,
+  m.prompt_price_per_token,
+  m.completion_price_per_token
+FROM
   selected_config sc
-JOIN 
+JOIN
   model_configs mc ON mc.id = sc.model_config_id
-JOIN 
+JOIN
   models m ON mc.model_id = m.id;`,
         )
         .then((rows) => rows.map(readModelConfig));
@@ -237,11 +268,12 @@ export async function fetchModelConfigById(
     modelConfigId: string,
 ): Promise<ModelConfig | null> {
     const rows = await db.select<ModelConfigDBRow[]>(
-        `SELECT model_configs.id, model_configs.display_name, model_configs.author, 
-                    model_configs.model_id, model_configs.system_prompt, models.is_enabled, 
+        `SELECT model_configs.id, model_configs.display_name, model_configs.author,
+                    model_configs.model_id, model_configs.system_prompt, models.is_enabled,
                     models.is_internal, models.supported_attachment_types, model_configs.is_default,
-                    models.is_deprecated, model_configs.budget_tokens, model_configs.reasoning_effort, model_configs.new_until
-             FROM model_configs 
+                    models.is_deprecated, model_configs.budget_tokens, model_configs.reasoning_effort, model_configs.new_until,
+                    models.prompt_price_per_token, models.completion_price_per_token
+             FROM model_configs
              JOIN models ON model_configs.model_id = models.id
              WHERE model_configs.id = ?`,
         [modelConfigId],

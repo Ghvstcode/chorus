@@ -14,6 +14,23 @@ interface ToolCall {
     content: string;
 }
 
+interface ToolCallElementProps {
+    name?: string;
+    "data-input"?: string;
+    children?: React.ReactNode;
+}
+
+function isToolCallElement(
+    child: unknown,
+): child is React.ReactElement<ToolCallElementProps> {
+    return (
+        child !== null &&
+        typeof child === "object" &&
+        "props" in child &&
+        typeof (child as React.ReactElement).props === "object"
+    );
+}
+
 function extractTextFromChildren(children: React.ReactNode): string {
     return React.Children.toArray(children)
         .map((child) => {
@@ -40,8 +57,12 @@ export const ToolCallGroup = ({ children }: { children?: React.ReactNode }) => {
             const childArray = Array.isArray(children) ? children : [children];
 
             // First, try to extract from properly parsed ToolCall components
-            childArray.forEach((child: any) => {
-                if (child?.props?.name && child?.props?.["data-input"]) {
+            childArray.forEach((child) => {
+                if (
+                    isToolCallElement(child) &&
+                    child.props.name &&
+                    child.props["data-input"]
+                ) {
                     try {
                         const content = atob(child.props["data-input"]);
                         calls.push({
@@ -49,17 +70,24 @@ export const ToolCallGroup = ({ children }: { children?: React.ReactNode }) => {
                             content: content,
                         });
                     } catch (e) {
-                        console.error('[ToolCallGroup] Failed to decode tool call:', e);
+                        console.error(
+                            "[ToolCallGroup] Failed to decode tool call:",
+                            e,
+                        );
                     }
                 }
             });
 
             // This handles cases where react-markdown doesn't parse all <tool-call> tags correctly
-            if (calls.length === 0 || childArray.some((child: any) => typeof child === "string")) {
+            if (
+                calls.length === 0 ||
+                childArray.some((child) => typeof child === "string")
+            ) {
                 const htmlContent = extractTextFromChildren(children);
 
                 // Extract tool calls from HTML string
-                const toolCallRegex = /<tool-call\s+name="([^"]+)"\s+data-input="([^"]+)"><\/tool-call>/g;
+                const toolCallRegex =
+                    /<tool-call\s+name="([^"]+)"\s+data-input="([^"]+)"><\/tool-call>/g;
                 let match;
 
                 while ((match = toolCallRegex.exec(htmlContent)) !== null) {
@@ -71,7 +99,10 @@ export const ToolCallGroup = ({ children }: { children?: React.ReactNode }) => {
                             content,
                         });
                     } catch (e) {
-                        console.error('[ToolCallGroup] Failed to decode tool call from HTML:', e);
+                        console.error(
+                            "[ToolCallGroup] Failed to decode tool call from HTML:",
+                            e,
+                        );
                     }
                 }
             }
@@ -82,13 +113,16 @@ export const ToolCallGroup = ({ children }: { children?: React.ReactNode }) => {
 
     // Memoize the summary calculation
     const summary = useMemo(() => {
-        const toolCounts = toolCalls.reduce((acc, tool) => {
-            acc[tool.name] = (acc[tool.name] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
+        const toolCounts = toolCalls.reduce(
+            (acc, tool) => {
+                acc[tool.name] = (acc[tool.name] || 0) + 1;
+                return acc;
+            },
+            {} as Record<string, number>,
+        );
 
         return Object.entries(toolCounts)
-            .map(([name, count]) => count > 1 ? `${name} (${count}×)` : name)
+            .map(([name, count]) => (count > 1 ? `${name} (${count}×)` : name))
             .join(", ");
     }, [toolCalls]);
 
@@ -105,7 +139,8 @@ export const ToolCallGroup = ({ children }: { children?: React.ReactNode }) => {
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                     <WrenchIcon className="w-3 h-3 flex-shrink-0 opacity-50" />
                     <span className="flex-shrink-0 font-medium opacity-70">
-                        {toolCalls.length} tool{toolCalls.length !== 1 ? "s" : ""}
+                        {toolCalls.length} tool
+                        {toolCalls.length !== 1 ? "s" : ""}
                     </span>
                     <span className="opacity-30">·</span>
                     <span className="opacity-50 truncate">{summary}</span>
@@ -115,7 +150,11 @@ export const ToolCallGroup = ({ children }: { children?: React.ReactNode }) => {
             <CollapsibleContent className="pt-2.5">
                 <div className="space-y-1.5 pl-0.5">
                     {toolCalls.map((tool, idx) => (
-                        <ToolCallItem key={idx} name={tool.name} content={tool.content} />
+                        <ToolCallItem
+                            key={idx}
+                            name={tool.name}
+                            content={tool.content}
+                        />
                     ))}
                 </div>
             </CollapsibleContent>
@@ -129,7 +168,7 @@ function ToolCallItem({ name, content }: { name: string; content: string }) {
     // Memoize the tool summary extraction
     const { summary, displayContent, isJSON } = useMemo(
         () => extractToolSummary(content),
-        [content]
+        [content],
     );
 
     return (
@@ -139,11 +178,15 @@ function ToolCallItem({ name, content }: { name: string; content: string }) {
             className="rounded-md border border-border/20 bg-background/30"
         >
             <CollapsibleTrigger className="group w-full px-2.5 py-1.5 text-left flex items-center gap-2 hover:bg-muted/20 transition-colors">
-                <span className="font-mono text-[11px] font-medium opacity-70">{name}</span>
+                <span className="font-mono text-[11px] font-medium opacity-70">
+                    {name}
+                </span>
                 {summary && (
                     <>
                         <span className="opacity-25 text-[11px]">·</span>
-                        <span className="opacity-50 truncate text-[11px] flex-1 font-mono">{summary}</span>
+                        <span className="opacity-50 truncate text-[11px] flex-1 font-mono">
+                            {summary}
+                        </span>
                     </>
                 )}
                 <ChevronDownIcon className="w-2.5 h-2.5 flex-shrink-0 transition-transform group-data-[state=open]:rotate-180 opacity-30" />

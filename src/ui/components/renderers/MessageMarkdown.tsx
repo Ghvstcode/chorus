@@ -152,19 +152,14 @@ const ToolCall = ({
         try {
             content = atob(dataInput);
         } catch (e) {
-            console.error('[ToolCall] Failed to decode data-input:', e);
+            console.error("[ToolCall] Failed to decode data-input:", e);
             content = extractTextFromChildren(children);
         }
     } else {
         content = extractTextFromChildren(children);
     }
 
-    return (
-        <ToolCallBlock
-            toolName={name || "Unknown"}
-            content={content}
-        />
-    );
+    return <ToolCallBlock toolName={name || "Unknown"} content={content} />;
 };
 
 export const Img = ({ src, alt }: { src?: string; alt?: string }) => {
@@ -288,12 +283,9 @@ export const MessageMarkdown = ({ text }: { text: string }) => {
             },
         )
         // Group consecutive tool-call tags together
-        .replace(
-            /(<tool-call[^>]*><\/tool-call>\s*)+/g,
-            (match) => {
-                return `\n<tool-call-group>\n${match}\n</tool-call-group>\n\n`;
-            },
-        );
+        .replace(/(<tool-call[^>]*><\/tool-call>\s*)+/g, (match) => {
+            return `\n<tool-call-group>\n${match}\n</tool-call-group>\n\n`;
+        });
 
     const finalProcessedText = processedMainText;
 

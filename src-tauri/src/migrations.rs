@@ -2460,6 +2460,102 @@ You have full access to bash commands on the user''''s computer. If you write a 
         },
         Migration {
             version: 132,
+            description: "disable claude 3.5 sonnet and add claude haiku 4.5 and opus 4.5",
+            kind: MigrationKind::Up,
+            sql: r#"
+                -- Disable Claude 3.5 Sonnet
+                UPDATE models
+                SET is_enabled = 0
+                WHERE id = 'anthropic::claude-3-5-sonnet-latest';
+
+                -- Add Claude Haiku 4.5 model
+                INSERT OR REPLACE INTO models (id, display_name, is_enabled, supported_attachment_types) VALUES
+                    ('anthropic::claude-haiku-4-5-20251001', 'Claude Haiku 4.5', 1, '["text", "image", "webpage", "pdf"]');
+
+                -- Add Claude Haiku 4.5 model config
+                INSERT OR REPLACE INTO model_configs (author, id, model_id, display_name, system_prompt, is_default, new_until) VALUES
+                    ('system', 'anthropic::claude-haiku-4-5-20251001', 'anthropic::claude-haiku-4-5-20251001', 'Claude Haiku 4.5', '', 0, '2025-10-15 00:00:00');
+
+                -- Add Claude Opus 4.5 model via Anthropic (in addition to OpenRouter version)
+                INSERT OR REPLACE INTO models (id, display_name, is_enabled, supported_attachment_types) VALUES
+                    ('anthropic::claude-opus-4-5-20251101', 'Claude Opus 4.5', 1, '["text", "image", "webpage", "pdf"]');
+
+                -- Add Claude Opus 4.5 model config via Anthropic
+                INSERT OR REPLACE INTO model_configs (author, id, model_id, display_name, system_prompt, is_default, new_until) VALUES
+                    ('system', 'anthropic::claude-opus-4-5-20251101', 'anthropic::claude-opus-4-5-20251101', 'Claude Opus 4.5', '', 0, '2025-10-15 00:00:00');
+            "#,
+        },
+        Migration {
+            version: 133,
+            description: "add gemini-3-flash-preview and gemini-3-pro-preview models",
+            kind: MigrationKind::Up,
+            sql: r#"
+                -- Add Gemini 3 Flash Preview model
+                INSERT OR REPLACE INTO models (id, display_name, is_enabled, supported_attachment_types) VALUES
+                    ('google::gemini-3-flash-preview', 'Gemini 3 Flash (Preview)', 1, '["text", "image", "webpage", "pdf"]');
+
+                -- Add Gemini 3 Flash Preview model config
+                INSERT OR REPLACE INTO model_configs (author, id, model_id, display_name, system_prompt, is_default) VALUES
+                    ('system', 'google::gemini-3-flash-preview', 'google::gemini-3-flash-preview', 'Gemini 3 Flash (Preview)', '', 0);
+
+                -- Add Gemini 3 Pro Preview model
+                INSERT OR REPLACE INTO models (id, display_name, is_enabled, supported_attachment_types) VALUES
+                    ('google::gemini-3-pro-preview', 'Gemini 3 Pro (Preview)', 1, '["text", "image", "webpage", "pdf"]');
+
+                -- Add Gemini 3 Pro Preview model config
+                INSERT OR REPLACE INTO model_configs (author, id, model_id, display_name, system_prompt, is_default) VALUES
+                    ('system', 'google::gemini-3-pro-preview', 'google::gemini-3-pro-preview', 'Gemini 3 Pro (Preview)', '', 0);
+            "#,
+        },
+        Migration {
+            version: 134,
+            description: "add pricing columns to models table",
+            kind: MigrationKind::Up,
+            sql: r#"
+                ALTER TABLE models ADD COLUMN prompt_price_per_token REAL;
+                ALTER TABLE models ADD COLUMN completion_price_per_token REAL;
+            "#,
+        },
+        Migration {
+            version: 135,
+            description: "add token usage and cost to messages table",
+            kind: MigrationKind::Up,
+            sql: r#"
+                ALTER TABLE messages ADD COLUMN prompt_tokens INTEGER;
+                ALTER TABLE messages ADD COLUMN completion_tokens INTEGER;
+                ALTER TABLE messages ADD COLUMN total_tokens INTEGER;
+                ALTER TABLE messages ADD COLUMN cost_usd REAL;
+            "#,
+        },
+        Migration {
+            version: 136,
+            description: "add total cost to chats table",
+            kind: MigrationKind::Up,
+            sql: r#"
+                ALTER TABLE chats ADD COLUMN total_cost_usd REAL DEFAULT 0.0;
+                CREATE INDEX IF NOT EXISTS idx_messages_chat_cost ON messages(chat_id, cost_usd);
+            "#,
+        },
+        Migration {
+            version: 137,
+            description: "add total cost to projects table",
+            kind: MigrationKind::Up,
+            sql: r#"
+                ALTER TABLE projects ADD COLUMN total_cost_usd REAL DEFAULT 0.0;
+                CREATE INDEX IF NOT EXISTS idx_chats_project_cost ON chats(project_id, total_cost_usd);
+            "#,
+        },
+        Migration {
+            version: 138,
+            description: "set default cost values for existing rows",
+            kind: MigrationKind::Up,
+            sql: r#"
+                UPDATE chats SET total_cost_usd = 0.0 WHERE total_cost_usd IS NULL;
+                UPDATE projects SET total_cost_usd = 0.0 WHERE total_cost_usd IS NULL;
+            "#,
+        },
+        Migration {
+            version: 139,
             description: "add claude code provider models for using claude code subscription",
             kind: MigrationKind::Up,
             sql: r#"
